@@ -1,4 +1,4 @@
-namespace DN.WebApi.Host.Configurations;
+namespace FSH.WebApi.Host.Configurations;
 
 internal static class Startup
 {
@@ -26,10 +26,14 @@ internal static class Startup
                 .AddJsonFile($"{configurationsDirectory}/middleware.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"{configurationsDirectory}/security.json", optional: false, reloadOnChange: true)
                 .AddJsonFile($"{configurationsDirectory}/security.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
-                .AddJsonFile($"{configurationsDirectory}/swagger.json", optional: false, reloadOnChange: true)
-                .AddJsonFile($"{configurationsDirectory}/swagger.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"{configurationsDirectory}/openapi.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"{configurationsDirectory}/openapi.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"{configurationsDirectory}/signalr.json", optional: false, reloadOnChange: true)
                 .AddJsonFile($"{configurationsDirectory}/signalr.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"{configurationsDirectory}/securityheaders.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"{configurationsDirectory}/securityheaders.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"{configurationsDirectory}/localization.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"{configurationsDirectory}/localization.{env.EnvironmentName}.json", optional: true, reloadOnChange: true)
                 .AddEnvironmentVariables();
         });
         return host;

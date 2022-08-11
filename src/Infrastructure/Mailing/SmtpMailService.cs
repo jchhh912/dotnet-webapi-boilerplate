@@ -1,12 +1,11 @@
-using DN.WebApi.Application.Common.Interfaces;
-using DN.WebApi.Shared.DTOs.Mailing;
+using FSH.WebApi.Application.Common.Mailing;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 
-namespace DN.WebApi.Infrastructure.Mailing;
+namespace FSH.WebApi.Infrastructure.Mailing;
 
 public class SmtpMailService : IMailService
 {
@@ -19,11 +18,14 @@ public class SmtpMailService : IMailService
         _logger = logger;
     }
 
-    public async Task SendAsync(MailRequest request)
+    public async Task SendAsync(MailRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
             var email = new MimeMessage();
+
+            // From
+            email.From.Add(new MailboxAddress(_settings.DisplayName, request.From ?? _settings.From));
 
             // To
             foreach (string address in request.To)
@@ -70,10 +72,10 @@ public class SmtpMailService : IMailService
             email.Body = builder.ToMessageBody();
 
             using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.StartTls);
-            await smtp.AuthenticateAsync(_settings.UserName, _settings.Password);
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            await smtp.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.StartTls, cancellationToken);
+            await smtp.AuthenticateAsync(_settings.UserName, _settings.Password, cancellationToken);
+            await smtp.SendAsync(email, cancellationToken);
+            await smtp.DisconnectAsync(true, cancellationToken);
         }
         catch (Exception ex)
         {

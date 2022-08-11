@@ -1,12 +1,12 @@
 using System.Linq.Expressions;
 
-namespace DN.WebApi.Application.Common.Interfaces;
+namespace FSH.WebApi.Application.Common.Interfaces;
 
 public interface IJobService : ITransientService
 {
     string Enqueue(Expression<Action> methodCall);
 
-    string Enqueue(Expression<Func<Task>> expression);
+    string Enqueue(Expression<Func<Task>> methodCall);
 
     string Enqueue<T>(Expression<Action<T>> methodCall);
 

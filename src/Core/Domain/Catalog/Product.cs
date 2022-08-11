@@ -1,20 +1,21 @@
-using DN.WebApi.Domain.Common;
-using DN.WebApi.Domain.Common.Contracts;
-using DN.WebApi.Domain.Contracts;
+namespace FSH.WebApi.Domain.Catalog;
 
-namespace DN.WebApi.Domain.Catalog;
-
-public class Product : AuditableEntity, IMustHaveTenant
+public class Product : AuditableEntity, IAggregateRoot
 {
-    public string? Name { get; private set; }
+    public string Name { get; private set; } = default!;
     public string? Description { get; private set; }
     public decimal Rate { get; private set; }
-    public string? Tenant { get; set; }
-    public string? ImagePath { get; set; }
-    public Guid BrandId { get; set; }
-    public virtual Brand Brand { get; set; } = default!;
+    public string? ImagePath { get; private set; }
+    public Guid BrandId { get; private set; }
+    public virtual Brand Brand { get; private set; } = default!;
 
-    public Product(string? name, string? description, decimal rate, in Guid brandId, string? imagePath)
+    public Product()
+    {
+        // Only needed for working with dapper (See GetProductViaDapperRequest)
+        // If you're not using dapper it's better to remove this constructor.
+    }
+
+    public Product(string name, string? description, decimal rate, Guid brandId, string? imagePath)
     {
         Name = name;
         Description = description;
@@ -23,17 +24,19 @@ public class Product : AuditableEntity, IMustHaveTenant
         BrandId = brandId;
     }
 
-    protected Product()
+    public Product Update(string? name, string? description, decimal? rate, Guid? brandId, string? imagePath)
     {
+        if (name is not null && Name?.Equals(name) is not true) Name = name;
+        if (description is not null && Description?.Equals(description) is not true) Description = description;
+        if (rate.HasValue && Rate != rate) Rate = rate.Value;
+        if (brandId.HasValue && brandId.Value != Guid.Empty && !BrandId.Equals(brandId.Value)) BrandId = brandId.Value;
+        if (imagePath is not null && ImagePath?.Equals(imagePath) is not true) ImagePath = imagePath;
+        return this;
     }
 
-    public Product Update(string? name, string? description, decimal rate, in Guid brandId, string? imagePath)
+    public Product ClearImagePath()
     {
-        if (name != null && !Name.NullToString().Equals(name)) Name = name;
-        if (description != null && !Description.NullToString().Equals(description)) Description = description;
-        if (Rate != rate) Rate = rate;
-        if (brandId != Guid.Empty && !BrandId.NullToString().Equals(brandId)) BrandId = brandId;
-        if (imagePath != null && !ImagePath.NullToString().Equals(imagePath)) ImagePath = imagePath;
+        ImagePath = string.Empty;
         return this;
     }
 }

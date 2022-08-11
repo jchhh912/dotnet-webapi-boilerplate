@@ -1,10 +1,12 @@
 using System.Text;
-using DN.WebApi.Application.Common.Interfaces;
+using FSH.WebApi.Application.Common.Caching;
+using FSH.WebApi.Application.Common.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
-namespace DN.WebApi.Infrastructure.Caching;
+namespace FSH.WebApi.Infrastructure.Caching;
 
+#pragma warning disable CA2254
 public class DistributedCacheService : ICacheService
 {
     private readonly IDistributedCache _cache;
@@ -15,13 +17,12 @@ public class DistributedCacheService : ICacheService
         (_cache, _serializer, _logger) = (cache, serializer, logger);
 
     public T? Get<T>(string key) =>
-        Get(key) is byte[] data
+        Get(key) is { } data
             ? Deserialize<T>(data)
             : default;
 
     private byte[]? Get(string key)
     {
-        // throw exception if key is null
         ArgumentNullException.ThrowIfNull(key);
 
         try
@@ -35,7 +36,7 @@ public class DistributedCacheService : ICacheService
     }
 
     public async Task<T?> GetAsync<T>(string key, CancellationToken token = default) =>
-        await GetAsync(key, token) is byte[] data
+        await GetAsync(key, token) is { } data
             ? Deserialize<T>(data)
             : default;
 

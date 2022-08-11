@@ -1,63 +1,65 @@
-using DN.WebApi.Application.Catalog.Interfaces;
-using DN.WebApi.Domain.Constants;
-using DN.WebApi.Infrastructure.Identity.Permissions;
-using DN.WebApi.Shared.DTOs.Catalog;
-using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.AspNetCore.Annotations;
+﻿using FSH.WebApi.Application.Catalog.Brands;
 
-namespace DN.WebApi.Host.Controllers.Catalog;
+namespace FSH.WebApi.Host.Controllers.Catalog;
 
-public class BrandsController : BaseController
+public class BrandsController : VersionedApiController
 {
-    private readonly IBrandService _service;
-
-    public BrandsController(IBrandService service)
+    [HttpPost("search")]
+    [MustHavePermission(FSHAction.Search, FSHResource.Brands)]
+    [OpenApiOperation("Search brands using available filters.", "")]
+    public Task<PaginationResponse<BrandDto>> SearchAsync(SearchBrandsRequest request)
     {
-        _service = service;
+        return Mediator.Send(request);
     }
 
-    [HttpPost("search")]
-    [MustHavePermission(PermissionConstants.Brands.Search)]
-    [SwaggerOperation(Summary = "Search Brands using available Filters.")]
-    public async Task<IActionResult> SearchAsync(BrandListFilter filter)
+    [HttpGet("{id:guid}")]
+    [MustHavePermission(FSHAction.View, FSHResource.Brands)]
+    [OpenApiOperation("Get brand details.", "")]
+    public Task<BrandDto> GetAsync(Guid id)
     {
-        var brands = await _service.SearchAsync(filter);
-        return Ok(brands);
+        return Mediator.Send(new GetBrandRequest(id));
     }
 
     [HttpPost]
-    [MustHavePermission(PermissionConstants.Brands.Register)]
-    public async Task<IActionResult> CreateAsync(CreateBrandRequest request)
+    [MustHavePermission(FSHAction.Create, FSHResource.Brands)]
+    [OpenApiOperation("Create a new brand.", "")]
+    public Task<Guid> CreateAsync(CreateBrandRequest request)
     {
-        return Ok(await _service.CreateBrandAsync(request));
+        return Mediator.Send(request);
     }
 
-    [HttpPut("{id}")]
-    [MustHavePermission(PermissionConstants.Brands.Update)]
-    public async Task<IActionResult> UpdateAsync(UpdateBrandRequest request, Guid id)
+    [HttpPut("{id:guid}")]
+    [MustHavePermission(FSHAction.Update, FSHResource.Brands)]
+    [OpenApiOperation("Update a brand.", "")]
+    public async Task<ActionResult<Guid>> UpdateAsync(UpdateBrandRequest request, Guid id)
     {
-        return Ok(await _service.UpdateBrandAsync(request, id));
+        return id != request.Id
+            ? BadRequest()
+            : Ok(await Mediator.Send(request));
     }
 
-    [HttpDelete("{id}")]
-    [MustHavePermission(PermissionConstants.Brands.Remove)]
-    public async Task<IActionResult> DeleteAsync(Guid id)
+    [HttpDelete("{id:guid}")]
+    [MustHavePermission(FSHAction.Delete, FSHResource.Brands)]
+    [OpenApiOperation("Delete a brand.", "")]
+    public Task<Guid> DeleteAsync(Guid id)
     {
-        var brandId = await _service.DeleteBrandAsync(id);
-        return Ok(brandId);
+        return Mediator.Send(new DeleteBrandRequest(id));
     }
 
     [HttpPost("generate-random")]
-    public async Task<IActionResult> GenerateRandomAsync(GenerateRandomBrandRequest request)
+    [MustHavePermission(FSHAction.Generate, FSHResource.Brands)]
+    [OpenApiOperation("Generate a number of random brands.", "")]
+    public Task<string> GenerateRandomAsync(GenerateRandomBrandRequest request)
     {
-        var jobId = await _service.GenerateRandomBrandAsync(request);
-        return Ok(jobId);
+        return Mediator.Send(request);
     }
 
     [HttpDelete("delete-random")]
-    public async Task<IActionResult> DeleteRandomAsync()
+    [MustHavePermission(FSHAction.Clean, FSHResource.Brands)]
+    [OpenApiOperation("Delete the brands generated with the generate-random call.", "")]
+    [ApiConventionMethod(typeof(FSHApiConventions), nameof(FSHApiConventions.Search))]
+    public Task<string> DeleteRandomAsync()
     {
-        var jobId = await _service.DeleteRandomBrandAsync();
-        return Ok(jobId);
+        return Mediator.Send(new DeleteRandomBrandRequest());
     }
 }

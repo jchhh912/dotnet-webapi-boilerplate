@@ -1,8 +1,8 @@
-﻿using DN.WebApi.Application.Common.Interfaces;
+﻿using FSH.WebApi.Application.Common.Caching;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DN.WebApi.Infrastructure.Caching;
+namespace FSH.WebApi.Infrastructure.Caching;
 
 internal static class Startup
 {
@@ -19,7 +19,8 @@ internal static class Startup
                     options.Configuration = settings.RedisURL;
                     options.ConfigurationOptions = new StackExchange.Redis.ConfigurationOptions()
                     {
-                        AbortOnConnectFail = true
+                        AbortOnConnectFail = true,
+                        EndPoints = { settings.RedisURL }
                     };
                 });
             }

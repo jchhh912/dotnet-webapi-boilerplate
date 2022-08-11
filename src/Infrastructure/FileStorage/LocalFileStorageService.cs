@@ -1,23 +1,22 @@
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using DN.WebApi.Application.FileStorage;
-using DN.WebApi.Domain.Common;
-using DN.WebApi.Infrastructure.Common.Extensions;
-using DN.WebApi.Shared.DTOs.FileStorage;
+using FSH.WebApi.Application.Common.FileStorage;
+using FSH.WebApi.Domain.Common;
+using FSH.WebApi.Infrastructure.Common.Extensions;
 
-namespace DN.WebApi.Infrastructure.FileStorage;
+namespace FSH.WebApi.Infrastructure.FileStorage;
 
 public class LocalFileStorageService : IFileStorageService
 {
-    public Task<string> UploadAsync<T>(FileUploadRequest? request, FileType supportedFileType)
+    public async Task<string> UploadAsync<T>(FileUploadRequest? request, FileType supportedFileType, CancellationToken cancellationToken = default)
     where T : class
     {
         if (request == null || request.Data == null)
         {
-            return Task.FromResult(string.Empty);
+            return string.Empty;
         }
 
-        if (request.Extension is null || !supportedFileType.GetDescriptionList().Contains(request.Extension))
+        if (request.Extension is null || !supportedFileType.GetDescriptionList().Contains(request.Extension.ToLower()))
             throw new InvalidOperationException("File Format Not Supported.");
         if (request.Name is null)
             throw new InvalidOperationException("Name is required.");
@@ -39,11 +38,7 @@ public class LocalFileStorageService : IFileStorageService
                 _ => Path.Combine("Files", "Others", folder),
             };
             string pathToSave = Path.Combine(Directory.GetCurrentDirectory(), folderName);
-            bool exists = Directory.Exists(pathToSave);
-            if (!exists)
-            {
-                Directory.CreateDirectory(pathToSave);
-            }
+            Directory.CreateDirectory(pathToSave);
 
             string fileName = request.Name.Trim('"');
             fileName = RemoveSpecialCharacters(fileName);
@@ -58,19 +53,26 @@ public class LocalFileStorageService : IFileStorageService
             }
 
             using var stream = new FileStream(fullPath, FileMode.Create);
-            streamData.CopyTo(stream);
-            dbPath = dbPath.Replace("\\", "/");
-            return Task.FromResult("{server_url}/" + dbPath);
+            await streamData.CopyToAsync(stream, cancellationToken);
+            return dbPath.Replace("\\", "/");
         }
         else
         {
-            return Task.FromResult(string.Empty);
+            return string.Empty;
         }
     }
 
     public static string RemoveSpecialCharacters(string str)
     {
         return Regex.Replace(str, "[^a-zA-Z0-9_.]+", string.Empty, RegexOptions.Compiled);
+    }
+
+    public void Remove(string? path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
     }
 
     private const string NumberPattern = "-{0}";

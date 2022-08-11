@@ -1,14 +1,17 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using MassTransit;
 
-namespace DN.WebApi.Domain.Common.Contracts;
+namespace FSH.WebApi.Domain.Common.Contracts;
 
-public abstract class BaseEntity
+public abstract class BaseEntity : BaseEntity<DefaultIdType>
 {
-    public Guid Id { get; private set; }
-    public List<DomainEvent> DomainEvents = new();
+    protected BaseEntity() => Id = NewId.Next().ToGuid();
+}
 
-    protected BaseEntity()
-    {
-        Id = NewId.Next().ToGuid();
-    }
+public abstract class BaseEntity<TId> : IEntity<TId>
+{
+    public TId Id { get; protected set; } = default!;
+
+    [NotMapped]
+    public List<DomainEvent> DomainEvents { get; } = new();
 }

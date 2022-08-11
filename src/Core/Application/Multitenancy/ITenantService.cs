@@ -1,15 +1,13 @@
-using DN.WebApi.Application.Common.Interfaces;
-using DN.WebApi.Shared.DTOs.Multitenancy;
+﻿namespace FSH.WebApi.Application.Multitenancy;
 
-namespace DN.WebApi.Application.Multitenancy;
-
-public interface ITenantService : IScopedService
+public interface ITenantService
 {
-    public string? GetDatabaseProvider();
-
-    public string? GetConnectionString();
-
-    public TenantDto? GetCurrentTenant();
-
-    public void SetCurrentTenant(string tenant);
+    Task<List<TenantDto>> GetAllAsync();
+    Task<bool> ExistsWithIdAsync(string id);
+    Task<bool> ExistsWithNameAsync(string name);
+    Task<TenantDto> GetByIdAsync(string id);
+    Task<string> CreateAsync(CreateTenantRequest request, CancellationToken cancellationToken);
+    Task<string> ActivateAsync(string id);
+    Task<string> DeactivateAsync(string id);
+    Task<string> UpdateSubscription(string id, DateTime extendedExpiryDate);
 }

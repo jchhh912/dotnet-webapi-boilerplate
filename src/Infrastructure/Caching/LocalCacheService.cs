@@ -1,8 +1,8 @@
-using DN.WebApi.Application.Common.Interfaces;
+using FSH.WebApi.Application.Common.Caching;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace DN.WebApi.Infrastructure.Caching;
+namespace FSH.WebApi.Infrastructure.Caching;
 
 public class LocalCacheService : ICacheService
 {
@@ -45,7 +45,7 @@ public class LocalCacheService : ICacheService
         }
 
         _cache.Set(key, value, new MemoryCacheEntryOptions { SlidingExpiration = slidingExpiration });
-        _logger.LogDebug($"Added to Cache : {key}");
+        _logger.LogDebug($"Added to Cache : {key}", key);
     }
 
     public Task SetAsync<T>(string key, T value, TimeSpan? slidingExpiration = null, CancellationToken token = default)

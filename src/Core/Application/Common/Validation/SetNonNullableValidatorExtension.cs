@@ -1,7 +1,6 @@
-﻿using FluentValidation;
-using FluentValidation.Validators;
+﻿using FluentValidation.Validators;
 
-namespace DN.WebApi.Application.Common.Validation;
+namespace FSH.WebApi.Application.Common.Validation;
 
 // SetValidator doesn't work when dealing with a nullable reference type
 // Use this SetNonNullableValidator extension method instead
@@ -15,7 +14,7 @@ public static class SetNonNullableValidatorExtension
             RuleSets = ruleSets
         };
 
-        return ruleBuilder.SetAsyncValidator((IAsyncPropertyValidator<T, TProperty?>)adapter);
+        return ruleBuilder.SetAsyncValidator(adapter);
     }
 
     private class NullableChildValidatorAdaptor<T, TProperty> : ChildValidatorAdaptor<T, TProperty>, IPropertyValidator<T, TProperty?>, IAsyncPropertyValidator<T, TProperty?>
@@ -24,7 +23,7 @@ public static class SetNonNullableValidatorExtension
             : base(validator, validatorType)
         {
         }
-
+#pragma warning disable RCS1132
         public override bool IsValid(ValidationContext<T> context, TProperty? value)
         {
             return base.IsValid(context, value!);
@@ -34,5 +33,6 @@ public static class SetNonNullableValidatorExtension
         {
             return base.IsValidAsync(context, value!, cancellation);
         }
+#pragma warning restore RCS1132
     }
 }

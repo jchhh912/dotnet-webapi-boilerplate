@@ -1,51 +1,34 @@
-using DN.WebApi.Application.Identity.Interfaces;
-using DN.WebApi.Infrastructure.Swagger;
-using DN.WebApi.Shared.DTOs.Identity;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.AspNetCore.Annotations;
+using FSH.WebApi.Application.Identity.Tokens;
 
-namespace DN.WebApi.Host.Controllers.Identity;
+namespace FSH.WebApi.Host.Controllers.Identity;
 
-[ApiController]
-[Route("api/[controller]")]
-public sealed class TokensController : ControllerBase
+public sealed class TokensController : VersionNeutralApiController
 {
     private readonly ITokenService _tokenService;
 
-    public TokensController(ITokenService tokenService)
-    {
-        _tokenService = tokenService;
-    }
+    public TokensController(ITokenService tokenService) => _tokenService = tokenService;
 
     [HttpPost]
     [AllowAnonymous]
-    [SwaggerHeader("tenant", "Input your tenant Id to access this API", "", true)]
-    [SwaggerOperation(Summary = "Submit Credentials with Tenant Key to generate valid Access Token.")]
-    public async Task<IActionResult> GetTokenAsync(TokenRequest request)
+    [TenantIdHeader]
+    [OpenApiOperation("Request an access token using credentials.", "")]
+    public Task<TokenResponse> GetTokenAsync(TokenRequest request, CancellationToken cancellationToken)
     {
-        var token = await _tokenService.GetTokenAsync(request, GenerateIPAddress());
-        return Ok(token);
+        return _tokenService.GetTokenAsync(request, GetIpAddress(), cancellationToken);
     }
 
     [HttpPost("refresh")]
     [AllowAnonymous]
-    [SwaggerHeader("tenant", "Input your tenant Id to access this API", "", true)]
-    public async Task<ActionResult> RefreshAsync(RefreshTokenRequest request)
+    [TenantIdHeader]
+    [OpenApiOperation("Request an access token using a refresh token.", "")]
+    [ApiConventionMethod(typeof(FSHApiConventions), nameof(FSHApiConventions.Search))]
+    public Task<TokenResponse> RefreshAsync(RefreshTokenRequest request)
     {
-        var response = await _tokenService.RefreshTokenAsync(request, GenerateIPAddress());
-        return Ok(response);
+        return _tokenService.RefreshTokenAsync(request, GetIpAddress());
     }
 
-    private string GenerateIPAddress()
-    {
-        if (Request.Headers.ContainsKey("X-Forwarded-For"))
-        {
-            return Request.Headers["X-Forwarded-For"];
-        }
-        else
-        {
-            return HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "N/A";
-        }
-    }
+    private string GetIpAddress() =>
+        Request.Headers.ContainsKey("X-Forwarded-For")
+            ? Request.Headers["X-Forwarded-For"]
+            : HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "N/A";
 }

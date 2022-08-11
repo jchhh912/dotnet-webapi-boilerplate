@@ -1,15 +1,11 @@
-using DN.WebApi.Domain.Common.Contracts;
-using MediatR;
+using FSH.WebApi.Shared.Events;
 
-namespace DN.WebApi.Application.Common.Events;
+namespace FSH.WebApi.Application.Common.Events;
 
-public class EventNotification<T> : INotification
-where T : DomainEvent
+public class EventNotification<TEvent> : INotification
+    where TEvent : IEvent
 {
-    public EventNotification(T domainEvent)
-    {
-        DomainEvent = domainEvent;
-    }
+    public EventNotification(TEvent @event) => Event = @event;
 
-    public T DomainEvent { get; }
+    public TEvent Event { get; }
 }

@@ -1,6 +1,8 @@
-namespace DN.WebApi.Domain.Common.Contracts;
+using FSH.WebApi.Shared.Events;
 
-public abstract class DomainEvent
+namespace FSH.WebApi.Domain.Common.Contracts;
+
+public abstract class DomainEvent : IEvent
 {
     public DateTime TriggeredOn { get; protected set; } = DateTime.UtcNow;
 }

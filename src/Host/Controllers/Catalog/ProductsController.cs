@@ -1,63 +1,65 @@
-using DN.WebApi.Application.Catalog.Interfaces;
-using DN.WebApi.Domain.Constants;
-using DN.WebApi.Infrastructure.Identity.Permissions;
-using DN.WebApi.Shared.DTOs.Catalog;
-using Microsoft.AspNetCore.Mvc;
+﻿using FSH.WebApi.Application.Catalog.Products;
 
-namespace DN.WebApi.Host.Controllers.Catalog;
+namespace FSH.WebApi.Host.Controllers.Catalog;
 
-public class ProductsController : BaseController
+public class ProductsController : VersionedApiController
 {
-    private readonly IProductService _service;
-
-    public ProductsController(IProductService service)
-    {
-        _service = service;
-    }
-
-    [HttpGet("{id}")]
-    [MustHavePermission(PermissionConstants.Products.View)]
-    public async Task<IActionResult> GetAsync(Guid id)
-    {
-        var product = await _service.GetProductDetailsAsync(id);
-        return Ok(product);
-    }
-
     [HttpPost("search")]
-    [MustHavePermission(PermissionConstants.Products.Search)]
-    public async Task<IActionResult> SearchAsync(ProductListFilter filter)
+    [MustHavePermission(FSHAction.Search, FSHResource.Products)]
+    [OpenApiOperation("Search products using available filters.", "")]
+    public Task<PaginationResponse<ProductDto>> SearchAsync(SearchProductsRequest request)
     {
-        var products = await _service.SearchAsync(filter);
-        return Ok(products);
+        return Mediator.Send(request);
+    }
+
+    [HttpGet("{id:guid}")]
+    [MustHavePermission(FSHAction.View, FSHResource.Products)]
+    [OpenApiOperation("Get product details.", "")]
+    public Task<ProductDetailsDto> GetAsync(Guid id)
+    {
+        return Mediator.Send(new GetProductRequest(id));
     }
 
     [HttpGet("dapper")]
-    [MustHavePermission(PermissionConstants.Products.View)]
-    public async Task<IActionResult> GetDapperAsync(Guid id)
+    [MustHavePermission(FSHAction.View, FSHResource.Products)]
+    [OpenApiOperation("Get product details via dapper.", "")]
+    public Task<ProductDto> GetDapperAsync(Guid id)
     {
-        var products = await _service.GetByIdUsingDapperAsync(id);
-        return Ok(products);
+        return Mediator.Send(new GetProductViaDapperRequest(id));
     }
 
     [HttpPost]
-    [MustHavePermission(PermissionConstants.Products.Register)]
-    public async Task<IActionResult> CreateAsync(CreateProductRequest request)
+    [MustHavePermission(FSHAction.Create, FSHResource.Products)]
+    [OpenApiOperation("Create a new product.", "")]
+    public Task<Guid> CreateAsync(CreateProductRequest request)
     {
-        return Ok(await _service.CreateProductAsync(request));
+        return Mediator.Send(request);
     }
 
-    [HttpPut("{id}")]
-    [MustHavePermission(PermissionConstants.Products.Update)]
-    public async Task<IActionResult> UpdateAsync(UpdateProductRequest request, Guid id)
+    [HttpPut("{id:guid}")]
+    [MustHavePermission(FSHAction.Update, FSHResource.Products)]
+    [OpenApiOperation("Update a product.", "")]
+    public async Task<ActionResult<Guid>> UpdateAsync(UpdateProductRequest request, Guid id)
     {
-        return Ok(await _service.UpdateProductAsync(request, id));
+        return id != request.Id
+            ? BadRequest()
+            : Ok(await Mediator.Send(request));
     }
 
-    [HttpDelete("{id}")]
-    [MustHavePermission(PermissionConstants.Products.Remove)]
-    public async Task<IActionResult> DeleteAsync(Guid id)
+    [HttpDelete("{id:guid}")]
+    [MustHavePermission(FSHAction.Delete, FSHResource.Products)]
+    [OpenApiOperation("Delete a product.", "")]
+    public Task<Guid> DeleteAsync(Guid id)
     {
-        var productId = await _service.DeleteProductAsync(id);
-        return Ok(productId);
+        return Mediator.Send(new DeleteProductRequest(id));
     }
-}
+
+    [HttpPost("export")]
+    [MustHavePermission(FSHAction.Export, FSHResource.Products)]
+    [OpenApiOperation("Export a products.", "")]
+    public async Task<FileResult> ExportAsync(ExportProductsRequest filter)
+    {
+        var result = await Mediator.Send(filter);
+        return File(result, "application/octet-stream", "ProductExports");
+    }
+    }

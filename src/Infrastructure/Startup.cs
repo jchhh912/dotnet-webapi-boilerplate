@@ -1,24 +1,31 @@
-using DN.WebApi.Infrastructure.Caching;
-using DN.WebApi.Infrastructure.Common;
-using DN.WebApi.Infrastructure.Cors;
-using DN.WebApi.Infrastructure.FileStorage;
-using DN.WebApi.Infrastructure.Hangfire;
-using DN.WebApi.Infrastructure.Identity;
-using DN.WebApi.Infrastructure.Localization;
-using DN.WebApi.Infrastructure.Mailing;
-using DN.WebApi.Infrastructure.Mapping;
-using DN.WebApi.Infrastructure.Middleware;
-using DN.WebApi.Infrastructure.Multitenancy;
-using DN.WebApi.Infrastructure.Notifications;
-using DN.WebApi.Infrastructure.Seeding;
-using DN.WebApi.Infrastructure.Swagger;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using FSH.WebApi.Infrastructure.Auth;
+using FSH.WebApi.Infrastructure.BackgroundJobs;
+using FSH.WebApi.Infrastructure.Caching;
+using FSH.WebApi.Infrastructure.Common;
+using FSH.WebApi.Infrastructure.Cors;
+using FSH.WebApi.Infrastructure.FileStorage;
+using FSH.WebApi.Infrastructure.Localization;
+using FSH.WebApi.Infrastructure.Mailing;
+using FSH.WebApi.Infrastructure.Mapping;
+using FSH.WebApi.Infrastructure.Middleware;
+using FSH.WebApi.Infrastructure.Multitenancy;
+using FSH.WebApi.Infrastructure.Notifications;
+using FSH.WebApi.Infrastructure.OpenApi;
+using FSH.WebApi.Infrastructure.Persistence;
+using FSH.WebApi.Infrastructure.Persistence.Initialization;
+using FSH.WebApi.Infrastructure.SecurityHeaders;
+using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DN.WebApi.Infrastructure;
+[assembly: InternalsVisibleTo("Infrastructure.Test")]
+
+namespace FSH.WebApi.Infrastructure;
 
 public static class Startup
 {
@@ -27,48 +34,23 @@ public static class Startup
         MapsterSettings.Configure();
         return services
             .AddApiVersioning()
+            .AddAuth(config)
+            .AddBackgroundJobs(config)
             .AddCaching(config)
             .AddCorsPolicy(config)
-            .AddCurrentUser()
-            .AddCurrentTenant()
             .AddExceptionMiddleware()
-            .AddHangfire(config)
             .AddHealthCheck()
-            .AddIdentity(config)
-            .AddLocalization(config)
+            .AddPOLocalization(config)
             .AddMailing(config)
+            .AddMediatR(Assembly.GetExecutingAssembly())
+            .AddMultitenancy(config)
             .AddNotifications(config)
-            .AddPermissions()
+            .AddOpenApiDocumentation(config)
+            .AddPersistence(config)
             .AddRequestLogging(config)
             .AddRouting(options => options.LowercaseUrls = true)
-            .AddSeeders()
-            .AddServices()
-            .AddSwaggerDocumentation(config)
-            .AddMultitenancy(config); // Multitency needs to be last as this one also creates and/or migrates the database(s).
+            .AddServices();
     }
-
-    public static IApplicationBuilder UseInfrastructure(this IApplicationBuilder appBuilder, IConfiguration config) =>
-        appBuilder
-            .UseLocalization(config)
-            .UseStaticFiles()
-            .UseFileStorage()
-            .UseExceptionMiddleware()
-            .UseLocalization(config)
-            .UseRouting()
-            .UseCorsPolicy()
-            .UseAuthentication()
-            .UseCurrentUser()
-            .UseCurrentTenant()
-            .UseAuthorization()
-            .UseRequestLogging(config)
-            .UseHangfireDashboard(config)
-            .UseEndpoints(endpoints =>
-            {
-                endpoints.MapControllers().RequireAuthorization();
-                endpoints.MapHealthCheck();
-                endpoints.MapNotifications();
-            })
-            .UseSwaggerDocumentation(config);
 
     private static IServiceCollection AddApiVersioning(this IServiceCollection services) =>
         services.AddApiVersioning(config =>
@@ -80,6 +62,40 @@ public static class Startup
 
     private static IServiceCollection AddHealthCheck(this IServiceCollection services) =>
         services.AddHealthChecks().AddCheck<TenantHealthCheck>("Tenant").Services;
+
+    public static async Task InitializeDatabasesAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
+    {
+        // Create a new scope to retrieve scoped services
+        using var scope = services.CreateScope();
+
+        await scope.ServiceProvider.GetRequiredService<IDatabaseInitializer>()
+            .InitializeDatabasesAsync(cancellationToken);
+    }
+
+    public static IApplicationBuilder UseInfrastructure(this IApplicationBuilder builder, IConfiguration config) =>
+        builder
+            .UseRequestLocalization()
+            .UseStaticFiles()
+            .UseSecurityHeaders(config)
+            .UseFileStorage()
+            .UseExceptionMiddleware()
+            .UseRouting()
+            .UseCorsPolicy()
+            .UseAuthentication()
+            .UseCurrentUser()
+            .UseMultiTenancy()
+            .UseAuthorization()
+            .UseRequestLogging(config)
+            .UseHangfireDashboard(config)
+            .UseOpenApiDocumentation(config);
+
+    public static IEndpointRouteBuilder MapEndpoints(this IEndpointRouteBuilder builder)
+    {
+        builder.MapControllers().RequireAuthorization();
+        builder.MapHealthCheck();
+        builder.MapNotifications();
+        return builder;
+    }
 
     private static IEndpointConventionBuilder MapHealthCheck(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapHealthChecks("/api/health").RequireAuthorization();

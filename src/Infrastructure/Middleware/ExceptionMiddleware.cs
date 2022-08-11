@@ -1,29 +1,27 @@
 using System.Net;
-using DN.WebApi.Application.Common.Exceptions;
-using DN.WebApi.Application.Common.Interfaces;
-using DN.WebApi.Application.Identity.Interfaces;
-using DN.WebApi.Application.Wrapper;
+using FSH.WebApi.Application.Common.Exceptions;
+using FSH.WebApi.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Localization;
 using Serilog;
 using Serilog.Context;
 
-namespace DN.WebApi.Infrastructure.Middleware;
+namespace FSH.WebApi.Infrastructure.Middleware;
 
 internal class ExceptionMiddleware : IMiddleware
 {
     private readonly ICurrentUser _currentUser;
+    private readonly IStringLocalizer _t;
     private readonly ISerializerService _jsonSerializer;
-    private readonly IStringLocalizer<ExceptionMiddleware> _localizer;
 
     public ExceptionMiddleware(
-        ISerializerService jsonSerializer,
         ICurrentUser currentUser,
-        IStringLocalizer<ExceptionMiddleware> localizer)
+        IStringLocalizer<ExceptionMiddleware> localizer,
+        ISerializerService jsonSerializer)
     {
-        _jsonSerializer = jsonSerializer;
         _currentUser = currentUser;
-        _localizer = localizer;
+        _t = localizer;
+        _jsonSerializer = jsonSerializer;
     }
 
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
@@ -43,13 +41,14 @@ internal class ExceptionMiddleware : IMiddleware
             string errorId = Guid.NewGuid().ToString();
             LogContext.PushProperty("ErrorId", errorId);
             LogContext.PushProperty("StackTrace", exception.StackTrace);
-            var responseModel = await ErrorResult<string>.ReturnErrorAsync(exception.Message);
-            responseModel.Source = exception.TargetSite?.DeclaringType?.FullName;
-            responseModel.Exception = exception.Message.Trim();
-            responseModel.ErrorId = errorId;
-            responseModel.SupportMessage = _localizer["exceptionmiddleware.supportmessage"];
-            var response = context.Response;
-            response.ContentType = "application/json";
+            var errorResult = new ErrorResult
+            {
+                Source = exception.TargetSite?.DeclaringType?.FullName,
+                Exception = exception.Message.Trim(),
+                ErrorId = errorId,
+                SupportMessage = _t["Provide the ErrorId {0} to the support team for further analysis.", errorId]
+            };
+            errorResult.Messages.Add(exception.Message);
             if (exception is not CustomException && exception.InnerException != null)
             {
                 while (exception.InnerException != null)
@@ -61,21 +60,35 @@ internal class ExceptionMiddleware : IMiddleware
             switch (exception)
             {
                 case CustomException e:
-                    response.StatusCode = responseModel.StatusCode = (int)e.StatusCode;
-                    responseModel.Messages = e.ErrorMessages;
+                    errorResult.StatusCode = (int)e.StatusCode;
+                    if (e.ErrorMessages is not null)
+                    {
+                        errorResult.Messages = e.ErrorMessages;
+                    }
+
                     break;
 
                 case KeyNotFoundException:
-                    response.StatusCode = responseModel.StatusCode = (int)HttpStatusCode.NotFound;
+                    errorResult.StatusCode = (int)HttpStatusCode.NotFound;
                     break;
 
                 default:
-                    response.StatusCode = responseModel.StatusCode = (int)HttpStatusCode.InternalServerError;
+                    errorResult.StatusCode = (int)HttpStatusCode.InternalServerError;
                     break;
             }
 
-            Log.Error($"{responseModel.Exception} Request failed with Status Code {context.Response.StatusCode} and Error Id {errorId}.");
-            await response.WriteAsync(_jsonSerializer.Serialize(responseModel));
+            Log.Error($"{errorResult.Exception} Request failed with Status Code {context.Response.StatusCode} and Error Id {errorId}.");
+            var response = context.Response;
+            if (!response.HasStarted)
+            {
+                response.ContentType = "application/json";
+                response.StatusCode = errorResult.StatusCode;
+                await response.WriteAsync(_jsonSerializer.Serialize(errorResult));
+            }
+            else
+            {
+                Log.Warning("Can't write error response. Response has already started.");
+            }
         }
     }
 }

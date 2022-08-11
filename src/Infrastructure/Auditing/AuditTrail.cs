@@ -1,7 +1,7 @@
-using DN.WebApi.Application.Common.Interfaces;
+using FSH.WebApi.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
-namespace DN.WebApi.Infrastructure.Auditing;
+namespace FSH.WebApi.Infrastructure.Auditing;
 
 public class AuditTrail
 {
@@ -24,9 +24,8 @@ public class AuditTrail
     public List<string> ChangedColumns { get; } = new();
     public bool HasTemporaryProperties => TemporaryProperties.Count > 0;
 
-    public Trail ToAuditTrail()
-    {
-        var audit = new Trail
+    public Trail ToAuditTrail() =>
+        new()
         {
             UserId = UserId,
             Type = TrailType.ToString(),
@@ -37,6 +36,4 @@ public class AuditTrail
             NewValues = NewValues.Count == 0 ? null : _serializer.Serialize(NewValues),
             AffectedColumns = ChangedColumns.Count == 0 ? null : _serializer.Serialize(ChangedColumns)
         };
-        return audit;
-    }
 }

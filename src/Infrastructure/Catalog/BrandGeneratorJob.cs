@@ -1,90 +1,104 @@
-﻿using DN.WebApi.Application.Catalog.Interfaces;
-using DN.WebApi.Application.Common.Interfaces;
-using DN.WebApi.Application.Identity.Interfaces;
-using DN.WebApi.Domain.Catalog;
-using DN.WebApi.Domain.Dashboard;
-using DN.WebApi.Shared.DTOs.Notifications;
+﻿using Ardalis.Specification;
+using FSH.WebApi.Application.Catalog.Brands;
+using FSH.WebApi.Application.Common.Interfaces;
+using FSH.WebApi.Application.Common.Persistence;
+using FSH.WebApi.Domain.Catalog;
+using FSH.WebApi.Shared.Notifications;
 using Hangfire;
 using Hangfire.Console.Extensions;
 using Hangfire.Console.Progress;
 using Hangfire.Server;
+using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace DN.WebApi.Infrastructure.Catalog;
+namespace FSH.WebApi.Infrastructure.Catalog;
 
 public class BrandGeneratorJob : IBrandGeneratorJob
 {
-    private readonly IEventService _eventService;
     private readonly ILogger<BrandGeneratorJob> _logger;
-    private readonly IRepositoryAsync _repository;
+    private readonly ISender _mediator;
+    private readonly IReadRepository<Brand> _repository;
     private readonly IProgressBarFactory _progressBar;
     private readonly PerformingContext _performingContext;
-    private readonly INotificationService _notificationService;
+    private readonly INotificationSender _notifications;
     private readonly ICurrentUser _currentUser;
     private readonly IProgressBar _progress;
 
     public BrandGeneratorJob(
         ILogger<BrandGeneratorJob> logger,
-        IRepositoryAsync repository,
+        ISender mediator,
+        IReadRepository<Brand> repository,
         IProgressBarFactory progressBar,
         PerformingContext performingContext,
-        INotificationService notificationService,
-        ICurrentUser currentUser,
-        IEventService eventService)
+        INotificationSender notifications,
+        ICurrentUser currentUser)
     {
         _logger = logger;
+        _mediator = mediator;
         _repository = repository;
         _progressBar = progressBar;
         _performingContext = performingContext;
-        _notificationService = notificationService;
+        _notifications = notifications;
         _currentUser = currentUser;
         _progress = _progressBar.Create();
-        _eventService = eventService;
     }
 
-    private async Task Notify(string message, int progress = 0)
+    private async Task NotifyAsync(string message, int progress, CancellationToken cancellationToken)
     {
         _progress.SetValue(progress);
-        await _notificationService.SendMessageToUserAsync(
-            _currentUser.GetUserId().ToString(),
+        await _notifications.SendToUserAsync(
             new JobNotification()
             {
                 JobId = _performingContext.BackgroundJob.Id,
                 Message = message,
                 Progress = progress
-            });
+            },
+            _currentUser.GetUserId().ToString(),
+            cancellationToken);
     }
 
     [Queue("notdefault")]
-    public async Task GenerateAsync(int nSeed)
+    public async Task GenerateAsync(int nSeed, CancellationToken cancellationToken)
     {
-        await Notify("Your job processing has started");
+        await NotifyAsync("Your job processing has started", 0, cancellationToken);
+
         foreach (int index in Enumerable.Range(1, nSeed))
         {
-            await _repository.CreateAsync(new Brand(name: $"Brand Random - {Guid.NewGuid()}", "Funny description"));
-            await Notify("Progress: ", nSeed > 0 ? (index * 100 / nSeed) : 0);
+            await _mediator.Send(
+                new CreateBrandRequest
+                {
+                    Name = $"Brand Random - {Guid.NewGuid()}",
+                    Description = "Funny description"
+                },
+                cancellationToken);
+
+            await NotifyAsync("Progress: ", nSeed > 0 ? (index * 100 / nSeed) : 0, cancellationToken);
         }
 
-        await _repository.SaveChangesAsync();
-        await _eventService.PublishAsync(new StatsChangedEvent());
-        await Notify("Job successfully completed");
+        await NotifyAsync("Job successfully completed", 0, cancellationToken);
     }
 
     [Queue("notdefault")]
     [AutomaticRetry(Attempts = 5)]
-    public async Task CleanAsync()
+    public async Task CleanAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Initializing Job with Id: {JobId}", _performingContext.BackgroundJob.Id);
-        var items = await _repository.GetListAsync<Brand>(x => !string.IsNullOrEmpty(x.Name) && x.Name.Contains("Brand Random"));
-        _logger.LogInformation("Brands Random: {BrandsCount} ", items.Count.ToString());
+        _logger.LogInformation("Initializing Job with Id: {jobId}", _performingContext.BackgroundJob.Id);
+
+        var items = await _repository.ListAsync(new RandomBrandsSpec(), cancellationToken);
+
+        _logger.LogInformation("Brands Random: {brandsCount} ", items.Count.ToString());
 
         foreach (var item in items)
         {
-            await _repository.RemoveAsync(item);
+            await _mediator.Send(new DeleteBrandRequest(item.Id), cancellationToken);
         }
 
-        int rows = await _repository.SaveChangesAsync();
-        await _eventService.PublishAsync(new StatsChangedEvent());
-        _logger.LogInformation("Rows affected: {rows} ", rows.ToString());
+        _logger.LogInformation("All random brands deleted.");
     }
+}
+
+public class RandomBrandsSpec : Specification<Brand>
+{
+    public RandomBrandsSpec() =>
+        Query.Where(b => !string.IsNullOrEmpty(b.Name) && b.Name.Contains("Brand Random"));
 }
